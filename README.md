@@ -1,8 +1,8 @@
 # Banking API — Java + Spring Boot + PostgreSQL
 
-API REST bancaria construida con Spring Boot que expone operaciones de consulta y transferencia sobre una base de datos PostgreSQL real (Neon).
+API REST bancaria construida con Spring Boot que expone operaciones de consulta, transferencia y chat conversacional sobre una base de datos PostgreSQL real (Neon).
 
-Comparte la misma base de datos que el [chatbot bancario en Python](https://github.com/tonellijavier/ai-engineer-portfolio/tree/main/chatbot-bancario) — demostrando integración entre dos sistemas con tecnologías distintas sobre los mismos datos, como ocurre en arquitecturas bancarias reales.
+Comparte la misma base de datos que el [chatbot bancario en Python](https://github.com/tonellijavier/ai-engineer-portfolio/tree/main/chatbot-bancario) — demostrando integración real entre dos sistemas con tecnologías distintas sobre los mismos datos, como ocurre en arquitecturas bancarias reales.
 
 ---
 
@@ -12,38 +12,9 @@ Comparte la misma base de datos que el [chatbot bancario en Python](https://gith
 GET  /api/clientes/{dni}/saldo       → saldo y productos del cliente
 GET  /api/clientes/{dni}/movimientos → historial de movimientos ordenado por fecha
 POST /api/transferencias             → ejecuta una transferencia a un contacto habilitado
-```
-
-### Ejemplo — Consultar saldo
-
-```
-GET /api/clientes/12345678/saldo
-
-Response:
-{
-  "nombre": "Javier",
-  "saldo": 84000.0,
-  "productos": "Caja de ahorro en pesos, Tarjeta Visa débito"
-}
-```
-
-### Ejemplo — Ejecutar transferencia
-
-```
-POST /api/transferencias
-Body:
-{
-  "dniOrigen": "12345678",
-  "cbuDestino": "0000003100025786490015",
-  "monto": 1000
-}
-
-Response:
-{
-  "nombre": "Javier",
-  "saldo": 83000.0,
-  "productos": "..."
-}
+POST /api/chat/sesion                → crea una sesión de chat con el chatbot Python
+POST /api/chat/mensaje               → envía un mensaje al chatbot y devuelve la respuesta
+DELETE /api/chat/sesion/{sesionId}   → cierra la sesión de chat
 ```
 
 ---
@@ -51,71 +22,87 @@ Response:
 ## Arquitectura
 
 ```
-Request HTTP
-      ↓
-Controller   → recibe la request, valida el formato, devuelve la response
-      ↓
-Service      → lógica de negocio — validaciones, reglas, coordinación
-      ↓
-Repository   → acceso a la base de datos via JPA
-      ↓
-PostgreSQL (Neon)
+Cliente (app / frontend)
+        ↓
+API Java — Spring Boot :8081
+        ├── Valida DNI en PostgreSQL
+        ├── Ejecuta transferencias con @Transactional
+        └── Llama al chatbot Python via HTTP
+                ↓
+        Chatbot Python — FastAPI :8000
+                ├── LangGraph — maneja el flujo conversacional
+                ├── Groq (Llama 3.3) — genera las respuestas
+                └── PostgreSQL (Neon) — estado de sesiones
+                        ↓
+                PostgreSQL (Neon) — base de datos compartida
 ```
 
-**Patrón Controller → Service → Repository** — cada capa tiene una responsabilidad única y solo habla con la capa de abajo. Si mañana cambiás la base de datos, solo cambiás el Repository. Si cambiás el protocolo de comunicación, solo cambiás el Controller.
-
-### Estructura del proyecto
-
-```
-src/main/java/com/tonelli/banking_api/
-├── controller/
-│   └── ClienteController.java      ← endpoints REST
-├── service/
-│   └── ClienteService.java         ← lógica de negocio
-├── repository/
-│   ├── ClienteRepository.java      ← acceso a tabla clientes
-│   ├── ContactoRepository.java     ← acceso a tabla contactos
-│   └── MovimientoRepository.java   ← acceso a tabla movimientos
-├── model/
-│   ├── Cliente.java                ← entidad JPA → tabla clientes
-│   ├── Contacto.java               ← entidad JPA → tabla contactos
-│   └── Movimiento.java             ← entidad JPA → tabla movimientos
-├── dto/
-│   ├── SaldoResponse.java          ← lo que devuelve GET /saldo
-│   ├── MovimientoResponse.java     ← lo que devuelve GET /movimientos
-│   └── TransferenciaRequest.java   ← lo que recibe POST /transferencias
-└── BankingApiApplication.java      ← punto de entrada
-```
+Java actúa como **gateway** — autenticación, validación de negocio, operaciones financieras. Python maneja toda la lógica de AI. Cada sistema hace lo que mejor sabe hacer.
 
 ---
 
 ## Decisiones de diseño
 
-**DTOs separados de los Models**
+**Gateway pattern**
 
-Los Models representan las tablas de la base de datos con todos sus campos. Los DTOs exponen solo lo necesario al cliente — sin IDs internos ni datos sensibles. Cambiar la estructura interna no afecta lo que ve el usuario.
+Java no llama al LLM directamente — delega al chatbot Python via HTTP. Si mañana cambiás de Groq a Azure OpenAI, solo cambiás el servicio Python. Java no se entera.
+
+**Base de datos compartida**
+
+Ambos sistemas leen y escriben sobre la misma base de datos PostgreSQL. El saldo que actualiza la API Java es el mismo que consulta el chatbot Python en la próxima conversación. Así funciona en producción real: múltiples sistemas sobre el mismo Core Banking.
 
 **@Transactional en transferencias**
 
-La transferencia descuenta el saldo y registra el movimiento en dos operaciones SQL. `@Transactional` garantiza que si alguna falla, ambas se revierten — o todo o nada. Fundamental en operaciones financieras.
+La transferencia descuenta el saldo y registra el movimiento en dos operaciones SQL. `@Transactional` garantiza que si alguna falla, ambas se revierten — o todo o nada.
 
 **Validación de contactos habilitados**
 
-El endpoint de transferencia no acepta cualquier CBU — solo CBUs registrados en la tabla de contactos del cliente. Esto evita que un usuario inyecte un CBU arbitrario en el request.
+El endpoint de transferencia solo acepta CBUs registrados en la tabla de contactos del cliente — no cualquier CBU arbitrario. Refleja cómo funcionan los bancos reales.
 
-**Base de datos compartida con el chatbot Python**
+**Patrón Controller → Service → Repository**
 
-Ambos sistemas — la API Java y el chatbot bancario en Python — leen y escriben sobre la misma base de datos PostgreSQL. El saldo que actualiza la API Java es el mismo que ve el chatbot en la próxima consulta. Así funciona en producción real: múltiples sistemas sobre el mismo Core Banking.
+Cada capa tiene una responsabilidad única. Si cambiás la base de datos, solo cambiás el Repository. Si cambiás el protocolo, solo cambiás el Controller.
 
 ---
 
-## Base de datos — Neon (PostgreSQL)
+## Estructura del proyecto
 
-```sql
-clientes    → dni (PK), nombre, saldo, productos
-contactos   → id, dni_cliente, nombre, cbu, alias
-movimientos → id, dni_cliente, fecha, descripcion, monto
 ```
+src/main/java/com/tonelli/banking_api/
+├── controller/
+│   ├── ClienteController.java      ← endpoints de saldo, movimientos y transferencias
+│   └── ChatController.java         ← endpoints de chat — delega al chatbot Python
+├── service/
+│   ├── ClienteService.java         ← lógica de negocio bancario
+│   └── ChatbotClient.java          ← HTTP client que habla con el chatbot Python
+├── repository/
+│   ├── ClienteRepository.java
+│   ├── ContactoRepository.java
+│   └── MovimientoRepository.java
+├── model/
+│   ├── Cliente.java
+│   ├── Contacto.java
+│   └── Movimiento.java
+├── dto/
+│   ├── SaldoResponse.java
+│   ├── MovimientoResponse.java
+│   ├── TransferenciaRequest.java
+│   ├── ChatRequest.java            ← lo que recibe POST /api/chat/mensaje
+│   └── ChatResponse.java           ← lo que devuelve el chatbot
+└── GlobalExceptionHandler.java     ← manejo de errores — 404, 400 con mensajes claros
+```
+
+---
+
+## Manejo de errores
+
+```
+404 → cliente no encontrado, contacto no habilitado
+400 → saldo insuficiente, monto inválido
+500 → error inesperado
+```
+
+Todos los errores devuelven JSON con timestamp, status, y mensaje claro — no páginas de error genéricas.
 
 ---
 
@@ -124,8 +111,8 @@ movimientos → id, dni_cliente, fecha, descripcion, monto
 - **Java 21** — versión LTS
 - **Spring Boot 3.5** — framework principal
 - **Spring Data JPA + Hibernate** — acceso a datos
-- **Spring Web** — endpoints REST
-- **Lombok** — elimina boilerplate (getters, setters, constructores)
+- **Spring Web + RestTemplate** — endpoints REST y HTTP client
+- **Lombok** — elimina boilerplate
 - **PostgreSQL + Neon** — base de datos serverless compartida con el chatbot Python
 - **Maven** — gestión de dependencias
 
@@ -133,35 +120,20 @@ movimientos → id, dni_cliente, fecha, descripcion, monto
 
 ## Setup
 
-**Requisitos:**
-- Java 21+
-- Maven 3.9+
-
-**Clonar y configurar:**
+**Requisitos:** Java 21+, Maven 3.9+
 
 ```bash
 git clone https://github.com/tonellijavier/java-banking-api.git
 cd java-banking-api
-```
-
-Copiás el archivo de ejemplo y configurás tus credenciales:
-
-```bash
 cp src/main/resources/application.properties.example src/main/resources/application.properties
 ```
 
-Editás `application.properties` con tus datos de conexión a PostgreSQL.
-
-```properties
-spring.datasource.url=jdbc:postgresql://host/neondb?sslmode=require
-spring.datasource.username=tu_usuario
-spring.datasource.password=tu_password
-```
-
-**Correr:**
+Editás `application.properties` con tus credenciales de PostgreSQL y corrés:
 
 ```bash
 mvn spring-boot:run
 ```
 
-La API queda disponible en `http://localhost:8081`
+La API queda disponible en `http://localhost:8081`.
+
+Para la integración con el chatbot Python, el chatbot tiene que estar corriendo en `http://localhost:8000`.
