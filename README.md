@@ -144,7 +144,13 @@ git clone https://github.com/tonellijavier/java-banking-api.git
 cd java-banking-api
 ```
 
-En `src/main/resources/application.properties` configurás la conexión a PostgreSQL:
+Copiás el archivo de ejemplo y configurás tus credenciales:
+
+```bash
+cp src/main/resources/application.properties.example src/main/resources/application.properties
+```
+
+Editás `application.properties` con tus datos de conexión a PostgreSQL.
 
 ```properties
 spring.datasource.url=jdbc:postgresql://host/neondb?sslmode=require

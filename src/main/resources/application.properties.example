@@ -1,0 +1,10 @@
+server.port=8081
+
+spring.datasource.url=jdbc:postgresql://TU_HOST/neondb?sslmode=require
+spring.datasource.username=TU_USUARIO
+spring.datasource.password=TU_PASSWORD
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+spring.jpa.hibernate.ddl-auto=none
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
