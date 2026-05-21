@@ -1,6 +1,7 @@
 package com.tonelli.banking_api.controller;
 
 import com.tonelli.banking_api.dto.MovimientoResponse;
+import com.tonelli.banking_api.dto.ResumenResponse;
 import com.tonelli.banking_api.dto.SaldoResponse;
 import com.tonelli.banking_api.dto.TransferenciaRequest;
 import com.tonelli.banking_api.service.ClienteService;
@@ -62,6 +63,16 @@ public class ClienteController {
     @PostMapping("/transferencias")
     public ResponseEntity<SaldoResponse> transferir(@RequestBody TransferenciaRequest request) {
         SaldoResponse response = clienteService.ejecutarTransferencia(request);
+        return ResponseEntity.ok(response);
+    }
+
+    // ── GET /api/clientes/{dni}/resumen ───────────────────────────────────────
+//
+// Devuelve un resumen de la cuenta con totales calculados con Streams
+// Ejemplo: GET /api/clientes/12345678/resumen
+    @GetMapping("/clientes/{dni}/resumen")
+    public ResponseEntity<ResumenResponse> getResumen(@PathVariable String dni) {
+        ResumenResponse response = clienteService.obtenerResumen(dni);
         return ResponseEntity.ok(response);
     }
 }

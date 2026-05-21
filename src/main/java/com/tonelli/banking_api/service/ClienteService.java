@@ -1,6 +1,7 @@
 package com.tonelli.banking_api.service;
 
 import com.tonelli.banking_api.dto.MovimientoResponse;
+import com.tonelli.banking_api.dto.ResumenResponse;
 import com.tonelli.banking_api.dto.SaldoResponse;
 import com.tonelli.banking_api.dto.TransferenciaRequest;
 import com.tonelli.banking_api.model.Cliente;
@@ -120,6 +121,51 @@ public class ClienteService {
                 origen.getNombre(),
                 origen.getSaldo(),
                 origen.getProductos()
+        );
+    }
+
+    // ── RESUMEN DE CUENTA ──────────────────────────────────────────────────────
+
+    public ResumenResponse obtenerResumen(String dni) {
+
+        // Verificamos que el cliente existe
+        Cliente cliente = clienteRepository.findByDni(dni)
+                .orElseThrow(() -> new RuntimeException("Cliente no encontrado: " + dni));
+
+        // Traemos todos los movimientos del cliente
+        List<Movimiento> movimientos = movimientoRepository
+                .findByDniClienteOrderByFechaDesc(dni);
+
+        // Stream 1 — total gastado: suma de movimientos negativos
+        Double totalGastado = movimientos.stream()
+                .filter(m -> m.getMonto() < 0)
+                .mapToDouble(m -> m.getMonto())
+                .sum();
+
+        // Stream 2 — total recibido: suma de movimientos positivos
+        Double totalRecibido = movimientos.stream()
+                .filter(m -> m.getMonto() > 0)
+                .mapToDouble(m -> m.getMonto())
+                .sum();
+
+        // Stream 3 — cantidad total de movimientos
+        Long cantidadMovimientos = movimientos.stream()
+                .count();
+
+        // Stream 4 — descripción del último movimiento
+        // findFirst() devuelve el primero de la lista — que ya viene ordenada por fecha desc
+        String ultimoMovimiento = movimientos.stream()
+                .map(m -> m.getDescripcion())
+                .findFirst()
+                .orElse("Sin movimientos");
+
+        return new ResumenResponse(
+                cliente.getNombre(),
+                cliente.getSaldo(),
+                totalGastado,
+                totalRecibido,
+                cantidadMovimientos,
+                ultimoMovimiento
         );
     }
 }
