@@ -8,6 +8,8 @@ Comparte la misma base de datos que el [chatbot bancario en Python](https://gith
 
 ## Endpoints
 
+Documentación interactiva disponible en `http://localhost:8081/swagger-ui/index.html`
+
 ```
 GET  /api/clientes/{dni}/saldo       → saldo y productos del cliente
 GET  /api/clientes/{dni}/movimientos → historial de movimientos ordenado por fecha
@@ -94,6 +96,18 @@ src/main/java/com/tonelli/banking_api/
 
 ---
 
+## Documentación
+
+La API incluye documentación interactiva con Swagger UI. Una vez corriendo el proyecto, entrás a:
+
+```
+http://localhost:8081/swagger-ui/index.html
+```
+
+Desde ahí podés ver todos los endpoints, los parámetros que reciben y ejecutar requests directamente desde el navegador — sin Postman ni configuración adicional.
+
+---
+
 ## Manejo de errores
 
 ```
@@ -106,6 +120,26 @@ Todos los errores devuelven JSON con timestamp, status, y mensaje claro — no p
 
 ---
 
+## Testing
+
+Tests unitarios con JUnit y Mockito — el Service se testea en aislamiento sin base de datos real.
+
+```
+ClienteServiceTest
+  ✓ obtenerSaldo_clienteExistente_devuelveSaldo
+  ✓ obtenerSaldo_clienteNoExistente_lanzaExcepcion
+  ✓ ejecutarTransferencia_exitosa_devuelveSaldoActualizado
+  ✓ ejecutarTransferencia_saldoInsuficiente_lanzaExcepcion
+```
+
+Para correr los tests:
+
+```bash
+mvn test
+```
+
+---
+
 ## Stack
 
 - **Java 21** — versión LTS
@@ -113,6 +147,8 @@ Todos los errores devuelven JSON con timestamp, status, y mensaje claro — no p
 - **Spring Data JPA + Hibernate** — acceso a datos
 - **Spring Web + RestTemplate** — endpoints REST y HTTP client
 - **Lombok** — elimina boilerplate
+- **Springdoc OpenAPI (Swagger)** — documentación automática de endpoints
+- **JUnit + Mockito** — tests unitarios
 - **PostgreSQL + Neon** — base de datos serverless compartida con el chatbot Python
 - **Maven** — gestión de dependencias
 
