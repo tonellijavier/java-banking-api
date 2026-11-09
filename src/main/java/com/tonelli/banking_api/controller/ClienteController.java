@@ -54,11 +54,11 @@ public class ClienteController {
 
     // ── POST /api/transferencias ───────────────────────────────────────────────
     //
-    // Ejecuta una transferencia entre dos clientes
+    // Ejecuta una transferencia desde un cliente a uno de sus contactos habilitados
     // Jackson convierte el JSON del body a TransferenciaRequest automáticamente
     //
     // Ejemplo: POST /api/transferencias
-    // Body: {"dniOrigen": "12345678", "dniDestino": "87654321", "monto": 5000}
+    // Body: {"dniOrigen": "12345678", "cbuDestino": "0000003100025786490015", "monto": 5000}
     // Respuesta: saldo actualizado del cliente origen
     @PostMapping("/transferencias")
     public ResponseEntity<SaldoResponse> transferir(@RequestBody TransferenciaRequest request) {

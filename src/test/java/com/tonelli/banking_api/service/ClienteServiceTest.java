@@ -109,7 +109,7 @@ class ClienteServiceTest {
         contacto.setDniCliente("12345678");
 
         // Configuramos los mocks
-        when(clienteRepository.findByDni("12345678"))
+        when(clienteRepository.findByDniParaActualizar("12345678"))
                 .thenReturn(Optional.of(origen));
         when(contactoRepository.findByDniClienteAndCbu("12345678", "0000003100025786490015"))
                 .thenReturn(Optional.of(contacto));
@@ -150,7 +150,7 @@ class ClienteServiceTest {
         contacto.setCbu("0000003100025786490015");
         contacto.setDniCliente("12345678");
 
-        when(clienteRepository.findByDni("12345678"))
+        when(clienteRepository.findByDniParaActualizar("12345678"))
                 .thenReturn(Optional.of(origen));
         when(contactoRepository.findByDniClienteAndCbu("12345678", "0000003100025786490015"))
                 .thenReturn(Optional.of(contacto));
@@ -170,5 +170,29 @@ class ClienteServiceTest {
 
         // Verificamos que NO se guardó nada — la transacción se revirtió
         verify(movimientoRepository, never()).save(any());
+    }
+
+    // ── TEST 5 ─────────────────────────────────────────────────────────────────
+    // Monto inválido (cero, negativo o ausente) — se rechaza antes de tocar la base
+
+    @Test
+    void ejecutarTransferencia_montoInvalido_lanzaExcepcionSinConsultarBase() {
+
+        for (Double montoInvalido : new Double[]{0.0, -500.0, null}) {
+            TransferenciaRequest request = new TransferenciaRequest();
+            request.setDniOrigen("12345678");
+            request.setCbuDestino("0000003100025786490015");
+            request.setMonto(montoInvalido);
+
+            RuntimeException excepcion = assertThrows(
+                    RuntimeException.class,
+                    () -> clienteService.ejecutarTransferencia(request)
+            );
+
+            assertTrue(excepcion.getMessage().contains("mayor a cero"));
+        }
+
+        // Ningún repository debe haberse consultado
+        verifyNoInteractions(clienteRepository, contactoRepository, movimientoRepository);
     }
 }

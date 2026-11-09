@@ -81,25 +81,28 @@ public class ClienteService {
     @Transactional
     public SaldoResponse ejecutarTransferencia(TransferenciaRequest request) {
 
-        // Validación 1 — el cliente origen debe existir
-        Cliente origen = clienteRepository.findByDni(request.getDniOrigen())
+        // Validación 1 — monto presente y positivo
+        // Va primero: no tiene sentido consultar la base con un request inválido
+        if (request.getMonto() == null || request.getMonto() <= 0) {
+            throw new RuntimeException("El monto debe ser mayor a cero");
+        }
+
+        // Validación 2 — el cliente origen debe existir
+        // Se lee con bloqueo de fila para que otra transferencia concurrente
+        // sobre la misma cuenta espere a que esta termine
+        Cliente origen = clienteRepository.findByDniParaActualizar(request.getDniOrigen())
                 .orElseThrow(() -> new RuntimeException("Cliente origen no encontrado"));
 
-        // Validación 2 — el CBU debe corresponder a un contacto habilitado del cliente
+        // Validación 3 — el CBU debe corresponder a un contacto habilitado del cliente
         // Seguridad: no podés transferir a cualquier CBU, solo a tus contactos registrados
         // Esto evita que alguien inyecte un CBU arbitrario en el request
         Contacto contacto = contactoRepository
                 .findByDniClienteAndCbu(request.getDniOrigen(), request.getCbuDestino())
                 .orElseThrow(() -> new RuntimeException("Contacto no encontrado o no habilitado"));
 
-        // Validación 3 — saldo suficiente
+        // Validación 4 — saldo suficiente
         if (origen.getSaldo() < request.getMonto()) {
             throw new RuntimeException("Saldo insuficiente");
-        }
-
-        // Validación 4 — monto positivo
-        if (request.getMonto() <= 0) {
-            throw new RuntimeException("El monto debe ser mayor a cero");
         }
 
         // Ejecutamos la transferencia — descontamos del origen
